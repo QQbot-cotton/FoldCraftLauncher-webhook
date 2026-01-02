@@ -1,0 +1,42 @@
+name: Sync Releases from FoldCraftLauncher
+
+on:
+  schedule:
+    # 每小时检查一次，按需调整
+    - cron: '0 * * * *'
+  # 触发手动同步
+  workflow_dispatch:
+  
+jobs:
+  sync_release:
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout your fork repository
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+    
+      # 获取原始仓库的发布信息
+      - name: Get latest release from FoldCraftLauncher
+        run: |
+          curl --silent "https://api.github.com/repos/FCL-Team/FoldCraftLauncher/releases/latest" | jq -r .tag_name > release.txt
+    
+      # 获取当前 Fork 仓库的发布信息
+      - name: Get latest release in fork
+        run: |
+          curl --silent "https://api.github.com/repos/${{ github.repository }}/releases/latest" | jq -r .tag_name > current_release.txt
+    
+      # 比较更新并同步
+      - name: Check if release is new and update
+        run: |
+          original_release=$(cat release.txt)
+          current_release=$(cat current_release.txt)
+          if [ "$original_release" != "$current_release" ]; then
+            echo "New release detected: $original_release"
+            # 你可以在这里加入代码，执行 push 操作来更新仓库
+            git config --global user.email "furina@679716.com"
+            git config --global user.name "QQbot-cotton"
+            git commit --allow-empty -m "Sync release from FoldCraftLauncher $original_release"
+            git push
+          else
+            echo "No new release"
+          fi
