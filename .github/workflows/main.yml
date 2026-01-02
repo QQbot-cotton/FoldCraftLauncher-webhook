@@ -46,7 +46,7 @@ jobs:
           git config --global user.name "${{ secrets.GIT_NAME }}"
 
           # 将下载的文件添加到 Git
-          git add assets/*
+          git add -f assets/*
           git commit -m "Sync FoldCraftLauncher release $original_release"
           git push
         else
