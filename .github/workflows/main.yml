@@ -2,30 +2,37 @@ name: Sync Releases from FoldCraftLauncher
 
 on:
   schedule:
-    - cron: '0 * * * *'   # 每小时检查一次
-  workflow_dispatch:
+    # 每小时检查一次
+    - cron: '0 * * * *'
+  workflow_dispatch:  # 支持手动触发
 
 jobs:
   sync_release:
     runs-on: ubuntu-latest
 
     steps:
+    # 检出你的仓库
     - name: Checkout Repository
       uses: actions/checkout@v2
 
-    # 获取原仓库 release 信息
-    - name: Get latest release info
+    # 安装 Git LFS
+    - name: Install Git LFS
+      run: |
+        git lfs install
+
+    # 获取原仓库的发布信息
+    - name: Get latest release info from FoldCraftLauncher
       run: |
         curl --silent "https://api.github.com/repos/FCL-Team/FoldCraftLauncher/releases/latest" > upstream.json
         jq -r .tag_name upstream.json > release.txt
         jq -r '.assets[].browser_download_url' upstream.json > assets_urls.txt
 
-    # 获取当前 fork 最新 release
-    - name: Get latest fork release
+    # 获取当前 Fork 仓库的最新 release 信息
+    - name: Get latest release in fork
       run: |
         curl --silent "https://api.github.com/repos/${{ github.repository }}/releases/latest" | jq -r .tag_name > current_release.txt
     
-    # 下载 & 提交
+    # 检查是否有新版本并同步
     - name: Download and commit all assets
       run: |
         original_release=$(cat release.txt)
@@ -33,19 +40,22 @@ jobs:
         if [ "$original_release" != "$current_release" ]; then
           echo "New release detected: $original_release"
 
-          # 下载所有 APK
+          # 创建下载目录
           mkdir -p assets
+
+          # 下载所有 APK 文件
           while read url; do
             filename=$(basename "$url")
             echo "Downloading $filename"
             curl -L "$url" -o "assets/$filename"
           done < assets_urls.txt
 
-          # 配置 Git
+          # 配置 Git 用户信息
           git config --global user.email "${{ secrets.GIT_EMAIL }}"
           git config --global user.name "${{ secrets.GIT_NAME }}"
 
-          # 将下载的文件添加到 Git
+          # 强制添加被 Git 忽略的文件（通过 LFS 上传）
+          git lfs track "*.apk"
           git add -f assets/*
           git commit -m "Sync FoldCraftLauncher release $original_release"
           git push
